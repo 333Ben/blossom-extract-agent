@@ -15,7 +15,7 @@ async def save_raw_document(
     """Calls agent-gateway save_raw_document. Returns raw_document_id."""
     url = os.environ["AGENT_GATEWAY_URL"]
     secret = os.environ["AGENT_GATEWAY_SECRET"]
-    extraction_source = "mistral-ocr" if is_scanned else "pymupdf+pdfplumber"
+    extraction_source = "mistral_ocr" if is_scanned else "pymupdf"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
