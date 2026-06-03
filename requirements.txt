@@ -3,5 +3,4 @@ uvicorn[standard]
 pymupdf
 pdfplumber
 httpx
-mistralai==1.7.0
 python-multipart

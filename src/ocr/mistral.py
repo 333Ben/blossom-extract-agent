@@ -1,10 +1,11 @@
-import asyncio
 import base64
 import os
 
-from mistralai import Mistral
+import httpx
 
 from src.pdf.extractor import ExtractionResult
+
+MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr"
 
 
 def _count_markdown_tables(text: str) -> int:
@@ -12,29 +13,39 @@ def _count_markdown_tables(text: str) -> int:
 
 
 async def extract_ocr(content: bytes, page_count: int) -> ExtractionResult:
-    def _call() -> object:
-        client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
-        b64 = base64.b64encode(content).decode()
-        return client.ocr.process(
-            model="mistral-ocr-latest",
-            document={
-                "type": "document_url",
-                "document_url": f"data:application/pdf;base64,{b64}",
-            },
-        )
+    api_key = os.environ["MISTRAL_API_KEY"]
+    b64 = base64.b64encode(content).decode()
 
     try:
-        response = await asyncio.to_thread(_call)
-    except Exception as exc:
-        raise RuntimeError(f"Mistral OCR API error : {exc}") from exc
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                MISTRAL_OCR_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "mistral-ocr-latest",
+                    "document": {
+                        "type": "document_url",
+                        "document_url": f"data:application/pdf;base64,{b64}",
+                    },
+                },
+            )
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(f"Mistral OCR API {exc.response.status_code}: {exc.response.text}") from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError(f"Mistral OCR API injoignable : {exc}") from exc
 
-    pages = getattr(response, "pages", [])
+    data = resp.json()
+    pages = data.get("pages", [])
+
     parts: list[str] = []
-
     for i, page in enumerate(pages):
         if i > 0:
             parts.append(f"<!-- page:{i + 1} -->")
-        md = getattr(page, "markdown", "") or ""
+        md = page.get("markdown", "") or ""
         if md.strip():
             parts.append(md.strip())
 
