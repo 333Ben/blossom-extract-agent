@@ -58,7 +58,7 @@ async def extract(
         raise HTTPException(status_code=502, detail=str(exc))
 
     return {
-        "document_id": document_id,
+        "raw_document_id": document_id,
         "content_markdown": result.content_markdown,
         "is_scanned": result.is_scanned,
         "page_count": result.page_count,
